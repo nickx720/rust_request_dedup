@@ -10,6 +10,9 @@ use tracing_tree::HierarchicalLayer;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let tracer =
+        opentelemetry_jaeger::new_pipeline().install_batch(opentelemetry::runtime::Tokio)?;
+    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
     Registry::default()
         .with(EnvFilter::from_default_env())
         .with(
@@ -17,9 +20,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .with_targets(true)
                 .with_bracketed_fields(true),
         )
+        .with(telemetry)
         .init();
 
-    run_server().await
+    run_server().await?;
+    opentelemetry::global::shutdown_tracer_provider();
+    Ok(())
 }
 
 #[tracing::instrument]
